@@ -12,8 +12,9 @@
 
 ### 指令
 
-> 查證說明:實際的 rustscan 啟動指令本身沒有被截取到(scrollback 已經跑到一半才看到畫面),不杜撰確切的 flag 組合;以下是當時實際截取到的 nmap 原始輸出。
-
+```bash
+rustscan -a 10.129.63.67 -- -sCV -Pn -oA rustscan
+```
 ```
 Nmap scan report for 10.129.63.67
 Host is up, received user-set (0.061s latency).
