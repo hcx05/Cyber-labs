@@ -317,6 +317,44 @@ $db_name = '|database|';
 ```
 `cat: config: Is a directory` 是因為 `config*` 這個 glob 同時比對到一個叫 `config` 的資料夾(不是檔案),`cat` 對目錄會噴這個錯誤,但不影響同一行其他真正的檔案被正常讀取。
 
+### 補充:這些設定檔是什麼、有哪些有用資訊
+
+PHP 網站把「環境相關的設定」(資料庫位置、帳密、金鑰)獨立放進設定檔,程式啟動時讀取。檔名沒有統一標準,各專案自己決定,所以要**逐個打開看內容,不能只憑檔名判斷**。
+
+| 檔案 | 通常是什麼 | 本題的實際情況 |
+|---|---|---|
+| `config.example.php` | 專案隨附的**範本**。安裝時要複製成真正的設定檔再填值,放在 repo 裡所以不含真實密碼 | 只有 `|username|`、`|password|` 佔位符 |
+| `config.php` | 許多專案的**實際設定檔**(安裝後產生或手動填寫)。本題卻只是未填的範本 | 同樣是佔位符,沒有價值 |
+| `config.inc.php` | 本專案(OpenSTAManager)**實際被讀取的設定檔**,安裝精靈完成後寫入 | 有真實的 DB 帳號、密碼、資料庫名 |
+| `.env` | 另一種慣例(Laravel、Symfony、Node 等框架):以 `KEY=value` 存放環境變數,不寫成 PHP 程式碼。本題沒有這個檔案,但在其他靶機常見 | (本題未出現) |
+
+**怎麼判斷哪個是真的:**
+
+1. 內容:有沒有真實的值,而不是 `|username|`、`your_password`、`changeme`、`xxx` 這類佔位符。
+2. 時間:`ls -la` 看修改時間。範本跟著原始碼一起部署,時間一致;安裝後寫入的檔案時間較晚(本題 `config.inc.php` 是 Feb 18 2026,範本是 Dec 23 2025)。
+3. 讀取者:`grep -r "config.inc.php" .` 看程式實際 `include` 哪個檔案。
+
+**這類檔案常見的有用資訊:**
+
+- **資料庫連線**:`host`、`username`、`password`、`database`。本題就是由此連進 MySQL,再讀出使用者雜湊。
+- **密碼重複使用**:資料庫密碼常和系統帳號(SSH、`su`)相同,取得後要拿去試其他服務(見 `Credential Reuse`)。
+- **金鑰與 Secret**:`APP_KEY`、`JWT_SECRET`、session salt。可能用來偽造 token、session 或解密資料。
+- **第三方服務憑證**:SMTP、API key、雲端 access key、LDAP 綁定帳號。
+- **網站管理員資訊**:預設管理員帳號、安裝時設定的後台密碼。
+- **內網資訊**:DB 主機是不是 `localhost`、有沒有其他內網主機與服務位置,可用於橫向移動。
+- **除錯與路徑**:`DEBUG=true`、絕對路徑、log 位置,能協助後續利用。
+
+**可以順便找的相近檔案:**
+
+```bash
+find /var/www -maxdepth 4 \( -name ".env*" -o -name "config*.php" -o -name "wp-config.php" -o -name "settings.php" -o -name "*.bak" -o -name "*.old" \) 2>/dev/null
+grep -rIl "password" /var/www 2>/dev/null
+```
+
+`.env.bak`、`config.php.bak`、`config.php~` 這類備份檔常被編輯器或管理員遺留,而且常以純文字被 web server 直接提供(沒有被當成 PHP 執行),所以也是遠端可下載的目標。
+
+**防禦面**:設定檔放在 web root 之外、權限限制為只有服務帳號可讀(`chmod 640`)、不要在多個服務共用同一組密碼。
+
 ### 連進 MySQL
 
 ```
